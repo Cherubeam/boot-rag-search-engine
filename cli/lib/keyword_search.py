@@ -1,6 +1,6 @@
 import string
 
-from .search_utils import DEFAULT_SEARCH_LIMIT, load_movies
+from .search_utils import DEFAULT_SEARCH_LIMIT, load_movies, load_stopwords
 
 
 def search_command(query: str, limit: int = DEFAULT_SEARCH_LIMIT) -> list[dict]:
@@ -58,6 +58,19 @@ def preprocess_text(text: str) -> list[str]:
     return text
 
 
+def remove_stopwords(tokens: list[str]) -> list[str]:
+    """Remove stopwords from the list of tokens.
+
+    Args:
+        tokens (list[str]): The list of tokens.
+
+    Returns:
+        list[str]: A list of tokens with stopwords removed.
+    """
+    stopwords = load_stopwords()
+    return [token for token in tokens if token not in stopwords]
+
+
 def tokenize_text(text: str) -> list[str]:
     """Tokenize the input text into words.
 
@@ -72,5 +85,6 @@ def tokenize_text(text: str) -> list[str]:
     for token in tokens:
         if token:
             valid_tokens.append(token)
-            
+    valid_tokens = remove_stopwords(valid_tokens)
+
     return valid_tokens
