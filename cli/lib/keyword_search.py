@@ -16,10 +16,9 @@ def search_command(query: str, limit: int = DEFAULT_SEARCH_LIMIT) -> list[dict]:
     movies = load_movies()
     search_results = []
     for movie in movies:
-        preprocessed_query = preprocess_text(query)
-        preprocessed_title = preprocess_text(movie["title"])
-
-        if preprocessed_query in preprocessed_title:
+        query_tokens = tokenize_text(query)
+        title_tokens = tokenize_text(movie["title"])
+        if has_matching_token(query_tokens, title_tokens):
             search_results.append(movie)
             if len(search_results) >= limit:
                 break
@@ -27,7 +26,25 @@ def search_command(query: str, limit: int = DEFAULT_SEARCH_LIMIT) -> list[dict]:
     return search_results
 
 
-def preprocess_text(text: str) -> str:
+def has_matching_token(query_tokens: list[str], title_tokens: list[str]) -> bool:
+    """Check if there is any matching token between query and title tokens.
+
+    Args:
+        query_tokens (list[str]): List of tokens from the search query.
+        title_tokens (list[str]): List of tokens from the movie title.
+
+    Returns:
+        bool: True if there is at least one matching token, False otherwise.
+    """
+    for query_token in query_tokens:
+        for title_token in title_tokens:
+            if title_token.find(query_token) != -1:
+                return True
+            
+    return False
+
+
+def preprocess_text(text: str) -> list[str]:
     """Preprocess the input text by lowercasing and removing punctuation.
 
     Args:
@@ -37,5 +54,23 @@ def preprocess_text(text: str) -> str:
     """
     text = text.lower()
     text = text.translate(str.maketrans("", "", string.punctuation))
-    
+
     return text
+
+
+def tokenize_text(text: str) -> list[str]:
+    """Tokenize the input text into words.
+
+    Args:
+        text (str): The input text.
+    Returns:
+        list[str]: A list of tokens.
+    """
+    text = preprocess_text(text)
+    tokens = text.split()
+    valid_tokens = []
+    for token in tokens:
+        if token:
+            valid_tokens.append(token)
+            
+    return valid_tokens
