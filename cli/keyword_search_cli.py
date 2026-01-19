@@ -2,7 +2,7 @@
 
 import argparse
 
-from lib.keyword_search import search_command
+from lib.keyword_search import search_command, build_command
 
 
 def main() -> None:
@@ -12,6 +12,9 @@ def main() -> None:
     search_parser = subparsers.add_parser("search", help="Search movies using BM25")
     search_parser.add_argument("query", type=str, help="Search query")
 
+    subparsers.add_parser("build", help="Build the inverted index")
+
+
     args = parser.parse_args()
 
     match args.command:
@@ -19,7 +22,11 @@ def main() -> None:
             print(f"Searching for: {args.query}")
             search_results = search_command(args.query)
             for i, result in enumerate(search_results, 1):
-                print(f"{i}. {result['title']}")
+                print(f"{i}. ({result['id']}) {result['title']}")
+        case "build":
+            print("Building inverted index...")
+            build_command()
+            print("Inverted index built successfully.")
         case _:
             parser.print_help()
     
