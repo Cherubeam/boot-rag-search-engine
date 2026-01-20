@@ -34,6 +34,15 @@ class InvertedIndex:
             pickle.dump(self.index, f)
         with open(self.docmap_path, "wb") as f:
             pickle.dump(self.docmap, f)
+
+    def load(self) -> None:
+        try:
+            with open(self.index_path, "rb") as f:
+                self.index = pickle.load(f)
+            with open(self.docmap_path, "rb") as f:
+                self.docmap = pickle.load(f)
+        except FileNotFoundError:
+            raise Exception("Inverted index or docmap not found. Please build the index first.")
         
     def get_documents(self, term: str) -> list[int]:
         doc_ids = self.index.get(term.lower(), set())
@@ -49,8 +58,6 @@ def build_command() -> None:
     idx = InvertedIndex()
     idx.build()
     idx.save()
-    docs = idx.get_documents("merida")
-    print(f"First document for token 'merida' = {docs[0]}")
     
 
 def search_command(query: str, limit: int = DEFAULT_SEARCH_LIMIT) -> list[dict]:
@@ -63,17 +70,12 @@ def search_command(query: str, limit: int = DEFAULT_SEARCH_LIMIT) -> list[dict]:
     Returns:
         list[dict]: A list of matching movies.
     """
-    movies = load_movies()
-    search_results = []
-    for movie in movies:
-        query_tokens = tokenize_text(query)
-        title_tokens = tokenize_text(movie["title"])
-        if has_matching_token(query_tokens, title_tokens):
-            search_results.append(movie)
-            if len(search_results) >= limit:
-                break
-
-    return search_results
+    idx = InvertedIndex()
+    idx.load()
+    for token in tokenize_text(query):
+        doc_ids = idx.get_documents(token)
+        if doc_ids:
+            return [idx.docmap[doc_id] for doc_id in doc_ids[:limit]]
 
 
 def has_matching_token(query_tokens: list[str], title_tokens: list[str]) -> bool:
