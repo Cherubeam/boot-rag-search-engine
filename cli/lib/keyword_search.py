@@ -69,6 +69,7 @@ class InvertedIndex:
 
 
 def build_command() -> None:
+    """Build and save the inverted index."""
     idx = InvertedIndex()
     idx.build()
     idx.save()
@@ -90,24 +91,21 @@ def search_command(query: str, limit: int = DEFAULT_SEARCH_LIMIT) -> list[dict]:
         doc_ids = idx.get_documents(token)
         if doc_ids:
             return [idx.docmap[doc_id] for doc_id in doc_ids[:limit]]
+        
 
+def tf_command(doc_id: int, term: str) -> int:
+    """Get term frequency for a document and term.
 
-# def has_matching_token(query_tokens: list[str], title_tokens: list[str]) -> bool:
-#     """Check if there is any matching token between query and title tokens.
+    Args:
+        doc_id (int): Document ID.
+        term (str): Term to check.
 
-#     Args:
-#         query_tokens (list[str]): List of tokens from the search query.
-#         title_tokens (list[str]): List of tokens from the movie title.
-
-#     Returns:
-#         bool: True if there is at least one matching token, False otherwise.
-#     """
-#     for query_token in query_tokens:
-#         for title_token in title_tokens:
-#             if title_token.find(query_token) != -1:
-#                 return True
-            
-#     return False
+    Returns:
+        int: Term frequency in the document.
+    """
+    idx = InvertedIndex()
+    idx.load()
+    return idx.get_tf(doc_id, term)
 
 
 def preprocess_text(text: str) -> list[str]:
