@@ -17,6 +17,8 @@ from .search_utils import (
 
 
 class InvertedIndex:
+    """Inverted index for keyword search."""
+
     def __init__(self) -> None:
         self.index = defaultdict(set)
         self.docmap: dict[int, dict] = {}
@@ -28,6 +30,7 @@ class InvertedIndex:
         self.doc_lengths_path = os.path.join(CACHE_DIR, "doc_lengths.pkl")
 
     def build(self) -> None:
+        """Build the inverted index from the movie dataset."""
         movies = load_movies()
         for movie in movies:
             doc_id = movie["id"]
@@ -36,6 +39,7 @@ class InvertedIndex:
             self.__add_document(doc_id, doc_description)
 
     def save(self) -> None:
+        """Save the inverted index, docmap, term frequencies, and document lengths to disk."""
         os.makedirs(CACHE_DIR, exist_ok=True)
         with open(self.index_path, "wb") as f:
             pickle.dump(self.index, f)
@@ -47,6 +51,7 @@ class InvertedIndex:
             pickle.dump(self.doc_lengths, f)
 
     def load(self) -> None:
+        """Load the inverted index, docmap, term frequencies, and document lengths from disk."""
         try:
             with open(self.index_path, "rb") as f:
                 self.index = pickle.load(f)
@@ -62,10 +67,12 @@ class InvertedIndex:
             )
 
     def get_documents(self, term: str) -> list[int]:
+        """Get document IDs containing the given term."""
         doc_ids = self.index.get(term.lower(), set())
         return sorted(list(doc_ids)) if doc_ids else []
 
     def get_tf(self, doc_id: int, term: str) -> int:
+        """Get term frequency for a document and term."""
         tokens = tokenize_text(term)
         if len(tokens) != 1:
             raise ValueError("Term must be a single token.")
@@ -73,6 +80,7 @@ class InvertedIndex:
         return self.term_frequencies.get(doc_id, {}).get(term, 0)
 
     def get_idf(self, term: str) -> float:
+        """Get inverse document frequency for a given term."""
         tokens = tokenize_text(term)
         if len(tokens) != 1:
             raise ValueError("Term must be a single token.")
@@ -82,11 +90,13 @@ class InvertedIndex:
         return math.log((doc_count + 1) / (term_doc_count + 1))
 
     def get_tf_idf(self, doc_id: int, term: str) -> float:
+        """Get TF-IDF score for a document and term."""
         tf = self.get_tf(doc_id, term)
         idf = self.get_idf(term)
         return tf * idf
 
     def get_bm25_idf(self, term: str) -> float:
+        """Get BM25 inverse document frequency for a given term."""
         tokens = tokenize_text(term)
         if len(tokens) != 1:
             raise ValueError("Term must be a single token.")
@@ -96,6 +106,7 @@ class InvertedIndex:
         return math.log((doc_count - term_doc_count + 0.5) / (term_doc_count + 0.5) + 1)
 
     def get_bm25_tf(self, doc_id: int, term: str, k1=BM25_K1, b=BM25_B) -> float:
+        """Get BM25 term frequency for a given document ID and term."""
         tf = self.get_tf(doc_id, term)
         doc_length = self.doc_lengths.get(doc_id, 0)
         avg_doc_length = self.__get_avg_doc_length()
@@ -104,7 +115,30 @@ class InvertedIndex:
         norm_factor = 1 - b + b * (doc_length / avg_doc_length)
         return (tf * (k1 + 1)) / (tf + k1 * norm_factor)
 
+    def bm25(self, doc_id: int, term: str) -> float:
+        """Calculate BM25 score for a given document ID and term."""
+        bm25_tf = self.get_bm25_tf(doc_id, term)
+        bm25_idf = self.get_bm25_idf(term)
+        return bm25_tf * bm25_idf
+
+    def bm25_search(self, query: str, limit=DEFAULT_SEARCH_LIMIT) -> list[dict]:
+        """Search movies using BM25 ranking."""
+        query_tokens = tokenize_text(query)
+        scores = defaultdict(float)
+        for token in query_tokens:
+            for doc_id in self.get_documents(token):
+                scores[doc_id] += self.bm25(doc_id, token)
+        ranked_docs = sorted(scores.items(), key=lambda item: item[1], reverse=True)
+        top_docs = ranked_docs[:limit]
+        results = []
+        for doc_id, score in top_docs:
+            doc = self.docmap[doc_id].copy()
+            doc["score"] = score
+            results.append(doc)
+        return results
+
     def __add_document(self, doc_id: int, text: str) -> None:
+        """Add a document to the inverted index."""
         tokens = tokenize_text(text)
         self.term_frequencies[doc_id] = Counter(tokens)
         self.doc_lengths[doc_id] = len(tokens)
@@ -112,6 +146,7 @@ class InvertedIndex:
             self.index[token].add(doc_id)
 
     def __get_avg_doc_length(self) -> float:
+        """Calculate the average document length."""
         total_length = sum(self.doc_lengths.values())
         return total_length / len(self.doc_lengths) if self.doc_lengths else 0.0
 
@@ -216,6 +251,21 @@ def bm25_tf_command(doc_id: int, term: str, k1=BM25_K1, b=BM25_B) -> float:
     return idx.get_bm25_tf(doc_id, term, k1, b)
 
 
+def bm25_search_command(query: str, limit: int = DEFAULT_SEARCH_LIMIT) -> list[dict]:
+    """Search movies using BM25 ranking.
+
+    Args:
+        query (str): The search query.
+        limit (int): The maximum number of results to return.
+
+    Returns:
+        list[dict]: A list of matching movies ranked by BM25 score.
+    """
+    idx = InvertedIndex()
+    idx.load()
+    return idx.bm25_search(query, limit)
+
+
 def preprocess_text(text: str) -> list[str]:
     """Preprocess the input text by lowercasing and removing punctuation.
 
@@ -271,5 +321,4 @@ def tokenize_text(text: str) -> list[str]:
             valid_tokens.append(token)
     valid_tokens = remove_stopwords(valid_tokens)
     valid_tokens = [stem_words(token) for token in valid_tokens]
-
     return valid_tokens

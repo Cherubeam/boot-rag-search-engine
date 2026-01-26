@@ -10,6 +10,7 @@ from lib.keyword_search import (
     tfidf_command,
     bm25_idf_command,
     bm25_tf_command,
+    bm25_search_command,
 )
 
 from lib.keyword_search import BM25_K1, BM25_B
@@ -60,6 +61,11 @@ def main() -> None:
         "b", type=float, nargs="?", default=BM25_B, help="Tunable BM25 b parameter"
     )
 
+    bm25search_parser = subparsers.add_parser(
+        "bm25search", help="Search movies using full BM25 scoring"
+    )
+    bm25search_parser.add_argument("query", type=str, help="Search query")
+
     args = parser.parse_args()
 
     match args.command:
@@ -91,6 +97,12 @@ def main() -> None:
             print(
                 f"BM25 TF score of '{args.term}' in document {args.doc_id}: {bm25tf:.2f}"
             )
+        case "bm25search":
+            bm25_search_results = bm25_search_command(args.query)
+            for i, result in enumerate(bm25_search_results, 1):
+                print(
+                    f"{i}. ({result['id']}) {result['title']} – Score {result['score']:.2f}"
+                )
         case _:
             parser.print_help()
 
