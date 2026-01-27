@@ -3,7 +3,7 @@ import numpy as np
 
 from sentence_transformers import SentenceTransformer
 
-from .search_utils import CACHE_DIR, load_movies
+from .search_utils import CACHE_DIR, DEFAULT_SEARCH_LIMIT, load_movies
 
 MODEL_NAME = "all-MiniLM-L6-v2"
 MOVIE_EMBEDDINGS_PATH = os.path.join(CACHE_DIR, "movie_embeddings.npy")
@@ -51,6 +51,33 @@ class SemanticSearch:
         else:
             return self.build_embeddings(documents)
 
+    def search(self, query: str, limit) -> None:
+        """Search documents using cosine similarity."""
+        if self.embeddings is None:
+            raise ValueError(
+                "No embeddings loaded. Call `load_or_create_embeddings` first."
+            )
+
+        if self.documents is None or len(self.documents) == 0:
+            raise ValueError(
+                "No documents loaded. Call `load_or_create_embeddings` first."
+            )
+
+        query_embedding = self.generate_embedding(query)
+
+        similarities = []
+        for index, doc_embedding in enumerate(self.embeddings):
+            similarity_score = cosine_similarity(query_embedding, doc_embedding)
+            similarities.append((similarity_score, self.documents[index]))
+
+        similarities.sort(key=lambda x: x[0], reverse=True)
+        results = [
+            {"score": score, "title": doc["title"], "description": doc["description"]}
+            for score, doc in similarities
+        ]
+
+        return results[:limit]
+
 
 def verify_model() -> None:
     """Verify that the sentence transformer model loads correctly."""
@@ -92,3 +119,31 @@ def embed_query_text(query: str) -> None:
     print(f"Query: {query}")
     print(f"First 5 dimensions: {embedding[:5]}")
     print(f"Shape: {embedding.shape}")
+
+
+def cosine_similarity(vec1, vec2):
+    dot_product = np.dot(vec1, vec2)
+    norm1 = np.linalg.norm(vec1)
+    norm2 = np.linalg.norm(vec2)
+
+    if norm1 == 0 or norm2 == 0:
+        return 0.0
+
+    return dot_product / (norm1 * norm2)
+
+
+def semantic_search(query, limit=DEFAULT_SEARCH_LIMIT):
+    search_instance = SemanticSearch()
+    documents = load_movies()
+    search_instance.load_or_create_embeddings(documents)
+
+    results = search_instance.search(query, limit)
+
+    print(f"Query: {query}")
+    print(f"Top {len(results)} results:")
+    print()
+
+    for i, result in enumerate(results, 1):
+        print(f"{i}. {result['title']} (score: {result['score']:.4f})")
+        print(f"   {result['description'][:100]}...")
+        print()

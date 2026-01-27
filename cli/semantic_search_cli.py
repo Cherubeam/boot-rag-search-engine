@@ -3,10 +3,12 @@
 import argparse
 
 from lib.semantic_search import (
+    SemanticSearch,
     verify_model,
     verify_embeddings,
     embed_text,
     embed_query_text,
+    semantic_search,
 )
 
 
@@ -30,6 +32,14 @@ def main():
     )
     query_embed_parser.add_argument("query", help="Query to embed")
 
+    search_parser = subparsers.add_parser(
+        "search", help="Search documents using semantic search"
+    )
+    search_parser.add_argument("query", type=str, help="Search query")
+    search_parser.add_argument(
+        "--limit", type=int, default=5, help="Number of results to return"
+    )
+
     args = parser.parse_args()
 
     match args.command:
@@ -41,6 +51,8 @@ def main():
             embed_text(args.text)
         case "embedquery":
             embed_query_text(args.text)
+        case "search":
+            semantic_search(args.query, args.limit)
         case _:
             parser.print_help()
 
