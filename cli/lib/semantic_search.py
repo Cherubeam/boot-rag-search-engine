@@ -1,9 +1,17 @@
 import os
+import re
 import numpy as np
 
 from sentence_transformers import SentenceTransformer
 
-from .search_utils import CACHE_DIR, DEFAULT_SEARCH_LIMIT, load_movies
+from .search_utils import (
+    CACHE_DIR,
+    DEFAULT_SEARCH_LIMIT,
+    DEFAULT_CHUNK_SIZE,
+    DEFAULT_CHUNK_OVERLAP,
+    MAX_CHUNK_SIZE,
+    load_movies,
+)
 
 MODEL_NAME = "all-MiniLM-L6-v2"
 MOVIE_EMBEDDINGS_PATH = os.path.join(CACHE_DIR, "movie_embeddings.npy")
@@ -27,7 +35,7 @@ class SemanticSearch:
         """Build embeddings for a list of documents."""
         self.documents = documents
         self.document_map = {}
-        movies = []
+        movies = list[str]
         for doc in self.documents:
             self.document_map[doc["id"]] = doc
             movies.append(f"{doc['title']}: {doc['description']}")
@@ -77,6 +85,21 @@ class SemanticSearch:
         ]
 
         return results[:limit]
+
+
+class ChunkedSemanticSearch(SemanticSearch):
+    """Class for semantic search on chunked documents."""
+
+    def __init__(self, model_name=MODEL_NAME) -> None:
+        super().__init__(model_name)
+        self.chunk_embeddings = None
+        self.chunk_metadata = None
+
+    def build_chunk_embeddings(self, documents: list[dict]) -> None:
+        """Build embeddings for chunked documents."""
+        self.documents = documents
+        self.document_map = {}
+        chunks = list[str]
 
 
 def verify_model() -> None:
@@ -147,3 +170,63 @@ def semantic_search(query, limit=DEFAULT_SEARCH_LIMIT):
         print(f"{i}. {result['title']} (score: {result['score']:.4f})")
         print(f"   {result['description'][:100]}...")
         print()
+
+
+def chunk(
+    text: str,
+    chunk_size: int = DEFAULT_CHUNK_SIZE,
+    overlap: int = DEFAULT_CHUNK_OVERLAP,
+) -> None:
+    """Chunk the given text into smaller pieces."""
+    words = text.split()
+    chunks = []
+
+    if overlap > 0:
+        i = 0
+        while i < len(words):
+            if i == 0:
+                chunk = words[i : i + chunk_size]
+                chunks.append(" ".join(chunk))
+                i += chunk_size
+            else:
+                chunk = words[i - overlap : i - overlap + chunk_size]
+                chunks.append(" ".join(chunk))
+                i += chunk_size - overlap
+    else:
+        for i in range(0, len(words), chunk_size):
+            chunk = words[i : i + chunk_size]
+            chunks.append(" ".join(chunk))
+
+    print(f"Chunking {len(text)} characters")
+    for i, chunk in enumerate(chunks):
+        print(f"{i + 1}. {chunk}")
+
+
+def semantic_chunk(
+    text: str,
+    max_chunk_size: int = MAX_CHUNK_SIZE,
+    overlap: int = DEFAULT_CHUNK_OVERLAP,
+) -> None:
+    """Chunk the given text semantically into smaller pieces."""
+    sentences = re.split(r"(?<=[.!?])\s+", text)
+    chunks = []
+
+    if overlap > 0:
+        i = 0
+        while i < len(sentences):
+            if i == 0:
+                chunk = sentences[i : i + max_chunk_size]
+                chunks.append(" ".join(chunk))
+                i += max_chunk_size
+            else:
+                chunk = sentences[i - overlap : i - overlap + max_chunk_size]
+                chunks.append(" ".join(chunk))
+                i += max_chunk_size - overlap
+    else:
+        for i in range(0, len(sentences), max_chunk_size):
+            chunk = sentences[i : i + max_chunk_size]
+            chunks.append(" ".join(chunk))
+
+    print(f"Semantically chunking {len(text)} characters")
+    for i, chunk in enumerate(chunks):
+        print(f"{i + 1}. {chunk}")
