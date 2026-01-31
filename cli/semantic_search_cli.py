@@ -12,6 +12,7 @@ from lib.semantic_search import (
     semantic_search,
     chunk_print_text,
     semantic_chunk_print_text,
+    search_chunked,
 )
 
 
@@ -67,8 +68,16 @@ def main():
         help="Number of words to overlap between chunks",
     )
 
-    embed_chunks_parser = subparsers.add_parser(
+    subparsers.add_parser(
         "embed_chunks", help="Generate embeddings for document chunks"
+    )
+
+    search_chunke_parser = subparsers.add_parser(
+        "search_chunked", help="Search documents using chunked semantic search"
+    )
+    search_chunke_parser.add_argument("query", type=str, help="Search query")
+    search_chunke_parser.add_argument(
+        "--limit", type=int, default=5, help="Number of results to return"
     )
 
     args = parser.parse_args()
@@ -90,6 +99,8 @@ def main():
             semantic_chunk_print_text(args.text, args.max_chunk_size, args.overlap)
         case "embed_chunks":
             embed_chunks()
+        case "search_chunked":
+            search_chunked(args.query, args.limit)
         case _:
             parser.print_help()
 

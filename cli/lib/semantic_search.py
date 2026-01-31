@@ -10,10 +10,13 @@ from .search_utils import (
     DEFAULT_CHUNK_SIZE,
     DEFAULT_CHUNK_OVERLAP,
     DEFAULT_SEMANTIC_CHUNK_SIZE,
+    DOCUMENT_PREVIEW_LENGTH,
+    SCORE_PRECISION,
     MODEL_NAME,
     MOVIE_EMBEDDINGS_PATH,
     CHUNK_EMBEDDINGS_PATH,
     CHUNK_METADATA_PATH,
+    format_search_result,
     load_movies,
 )
 
@@ -153,6 +156,53 @@ class ChunkedSemanticSearch(SemanticSearch):
                 return self.chunk_embeddings
         else:
             return self.build_chunk_embeddings(documents)
+
+    def search_chunks(self, query: str, limit: int = 10) -> list[dict]:
+        """Search chunked documents using cosine similarity."""
+        if self.chunk_embeddings is None or self.chunk_metadata is None:
+            raise ValueError(
+                "No chunk embeddings loaded. Call load_or_create_chunk_embeddings first."
+            )
+
+        query_embedding = self.generate_embedding(query)
+        chunk_scores = []
+
+        for index, chunk_embedding in enumerate(self.chunk_embeddings):
+            similarity_score = cosine_similarity(query_embedding, chunk_embedding)
+            chunk_scores.append(
+                {
+                    "chunk_idx": index,
+                    "movie_idx": self.chunk_metadata[index]["movie_idx"],
+                    "score": similarity_score,
+                }
+            )
+
+        movie_scores = {}
+        for chunk_score in chunk_scores:
+            movie_idx = chunk_score["movie_idx"]
+            score = chunk_score["score"]
+            if movie_idx not in movie_scores or score > movie_scores[movie_idx]:
+                movie_scores[movie_idx] = score
+
+        ranked_movies = sorted(
+            movie_scores.items(), key=lambda item: item[1], reverse=True
+        )
+
+        formatted_results = []
+        for movie_idx, score in ranked_movies[:limit]:
+            if movie_idx is None:
+                continue
+            doc = self.documents[movie_idx]
+            formatted_results.append(
+                format_search_result(
+                    doc_id=doc["id"],
+                    title=doc["title"],
+                    document=doc["description"][:DOCUMENT_PREVIEW_LENGTH],
+                    score=score,
+                )
+            )
+
+        return formatted_results
 
 
 def verify_model() -> None:
@@ -311,3 +361,17 @@ def semantic_chunk_print_text(
     print(f"Semantically chunking {len(text)} characters")
     for i, chunk_text in enumerate(chunks):
         print(f"{i + 1}. {chunk_text}")
+
+
+def search_chunked(query: str, limit=DEFAULT_SEARCH_LIMIT):
+    movies = load_movies()
+    search_instance = ChunkedSemanticSearch()
+    search_instance.load_or_create_chunk_embeddings(movies)
+    results = search_instance.search_chunks(query, limit)
+
+    for i, result in enumerate(results, 1):
+        title = result["title"]
+        score = result["score"]
+        description = result["document"]
+        print(f"{i}. {title} (score: {score:.4f})")
+        print(f"   {description}...")
