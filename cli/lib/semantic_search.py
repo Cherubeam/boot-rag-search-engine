@@ -291,22 +291,11 @@ def chunk(
     """Chunk the given text into smaller pieces."""
     words = text.split()
     chunks = []
+    step = max(1, chunk_size - overlap)
 
-    if overlap > 0:
-        i = 0
-        while i < len(words):
-            if i == 0:
-                chunk = words[i : i + chunk_size]
-                chunks.append(" ".join(chunk))
-                i += chunk_size
-            else:
-                chunk = words[i - overlap : i - overlap + chunk_size]
-                chunks.append(" ".join(chunk))
-                i += chunk_size - overlap
-    else:
-        for i in range(0, len(words), chunk_size):
-            chunk = words[i : i + chunk_size]
-            chunks.append(" ".join(chunk))
+    for i in range(0, len(words), step):
+        chunk = words[i : i + chunk_size]
+        chunks.append(" ".join(chunk))
 
     return chunks
 
@@ -329,23 +318,18 @@ def semantic_chunk(
     overlap: int = DEFAULT_CHUNK_OVERLAP,
 ) -> list[str]:
     """Chunk the given text semantically into smaller pieces."""
-    sentences = re.split(r"(?<=[.!?])\s+", text)
-    chunks = []
+    sentences = re.split(r"(?<=[.!?])\s+", text.strip())
 
-    if overlap > 0:
-        i = 0
-        while i < len(sentences):
-            if i == 0:
-                chunk = sentences[i : i + max_chunk_size]
-                chunks.append(" ".join(chunk))
-                i += max_chunk_size
-            else:
-                chunk = sentences[i - overlap : i - overlap + max_chunk_size]
-                chunks.append(" ".join(chunk))
-                i += max_chunk_size - overlap
-    else:
-        for i in range(0, len(sentences), max_chunk_size):
-            chunk = sentences[i : i + max_chunk_size]
+    if not sentences:
+        return []
+
+    chunks = []
+    step = max(1, max_chunk_size - overlap)
+
+    for i in range(0, len(sentences), step):
+        chunk = sentences[i : i + max_chunk_size]
+        chunk = [s.strip() for s in chunk if s.strip()]
+        if chunk:
             chunks.append(" ".join(chunk))
 
     return chunks
