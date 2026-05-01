@@ -12,3 +12,7 @@ wheels/
 # Data files
 data/
 cache/
+
+# OS files
+.DS_Store
+Thumbs.db
